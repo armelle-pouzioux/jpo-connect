@@ -18,53 +18,43 @@ class JPO {
     }
 
     // Créer un JPO
-    public function create() {
-        $query = "INSERT INTO " . $this->table . " 
-                  (description, date_jpo, place, capacity, status) 
-                  VALUES (:description, :date_jpo, :place, :capacity, :status)";
+    public function create($data) {
+        $query = "INSERT INTO " . $this->table . " (description, date_jpo, place, capacity, registered, status)
+                  VALUES (:description, :date_jpo, :place, :capacity, :registered, :status)";
         
         $stmt = $this->conn->prepare($query);
         
-        $stmt->bindParam(':description', $this->description);
-        $stmt->bindParam(':date_jpo', $this->date_jpo);
-        $stmt->bindParam(':place', $this->place);
-        $stmt->bindParam(':capacity', $this->capacity);
-        $stmt->bindParam(':status', $this->status);
+        $stmt->bindParam(':description', $data['description']);
+        $stmt->bindParam(':date_jpo', $data['date_jpo']);
+        $stmt->bindParam(':place', $data['place']);
+        $stmt->bindParam(':capacity', $data['capacity']);
+        $stmt->bindParam(':registered', $data['registered']);
+        $stmt->bindParam(':status', $data['status']);
         
-        return $stmt->execute();
+        if ($stmt->execute()) {
+            return $this->conn->lastInsertId();
+        }
+        return false;
     }
 
     // Récupérer tous les JPO
-    public function getAll($filters = []) {
+    public function findAll($filters = []) {
         $query = "SELECT * FROM " . $this->table . " WHERE 1=1";
+        $params = [];
         
         // Filtres optionnels
         if (!empty($filters['place'])) {
             $query .= " AND place = :place";
+            $params[':place'] = $filters['place'];
         }
         if (!empty($filters['status'])) {
             $query .= " AND status = :status";
+            $params[':status'] = $filters['status'];
         }
-        if (!empty($filters['date_from'])) {
-            $query .= " AND date_jpo >= :date_from";
-        }
-        
         $query .= " ORDER BY date_jpo ASC";
         
         $stmt = $this->conn->prepare($query);
-        
-        // Bind des filtres
-        if (!empty($filters['place'])) {
-            $stmt->bindParam(':place', $filters['place']);
-        }
-        if (!empty($filters['status'])) {
-            $stmt->bindParam(':status', $filters['status']);
-        }
-        if (!empty($filters['date_from'])) {
-            $stmt->bindParam(':date_from', $filters['date_from']);
-        }
-        
-        $stmt->execute();
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 
@@ -90,49 +80,34 @@ class JPO {
     }
 
     // Mettre à jour un JPO
-    public function update() {
-        $query = "UPDATE " . $this->table . " 
-                  SET description = :description, date_jpo = :date_jpo, 
-                      place = :place, capacity = :capacity, status = :status
+    public function update($id, $data) {
+        $query = "UPDATE " . $this->table . " SET description = :description, date_jpo = :date_jpo, 
+                          place = :place, capacity = :capacity, status = :status 
                   WHERE id = :id";
         
         $stmt = $this->conn->prepare($query);
         
-        $stmt->bindParam(':id', $this->id);
-        $stmt->bindParam(':description', $this->description);
-        $stmt->bindParam(':date_jpo', $this->date_jpo);
-        $stmt->bindParam(':place', $this->place);
-        $stmt->bindParam(':capacity', $this->capacity);
-        $stmt->bindParam(':status', $this->status);
+        $stmt->bindParam(':description', $data['description']);
+        $stmt->bindParam(':date_jpo', $data['date_jpo']);
+        $stmt->bindParam(':place', $data['place']);
+        $stmt->bindParam(':capacity', $data['capacity']);
+        $stmt->bindParam(':status', $data['status']);
+        $stmt->bindParam(':id', $id);
         
         return $stmt->execute();
     }
 
     // Supprimer un JPO
-    public function delete() {
+    public function delete($id) {
         $query = "DELETE FROM " . $this->table . " WHERE id = :id";
         $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':id', $this->id);
+        $stmt->bindParam(':id', $id);
         return $stmt->execute();
     }
 
-    // Vérifier si des places sont disponibles
-    public function hasAvailableSpots() {
-        return $this->registered < $this->capacity;
-    }
-
-    // Mettre à jour le nombre d'inscrits
-    public function updateRegisteredCount() {
-        $query = "UPDATE " . $this->table . " 
-                  SET registered = (
-                      SELECT COUNT(*) FROM registration 
-                      WHERE jpo_id = :id
-                  ) 
-                  WHERE id = :id";
-        
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':id', $this->id);
-        return $stmt->execute();
+    public function getPlaces() {
+        // Retourne la liste des lieux possibles (en dur ou depuis la base)
+        return ['Marseille', 'Paris', 'Cannes', 'Martigues', 'Toulon', 'Brignoles'];
     }
 }
 

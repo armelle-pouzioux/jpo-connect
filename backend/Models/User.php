@@ -1,5 +1,4 @@
 <?php
-// models/User.php
 namespace Models;
 class User {
     private $conn;
@@ -17,27 +16,29 @@ class User {
         $this->conn = $db;
     }
 
-    // Créer un utilisateur
-    public function create() {
+    // Create user
+    public function create(array $data) {
         $query = "INSERT INTO " . $this->table . " 
                   (name, surname, email, password, role) 
                   VALUES (:name, :surname, :email, :password, :role)";
 
         $stmt = $this->conn->prepare($query);
 
-        // Hash du mot de passe
-        $hashed_password = password_hash($this->password, PASSWORD_DEFAULT);
+        $hashed_password = password_hash($data['password'], PASSWORD_DEFAULT);
 
-        $stmt->bindParam(':name', $this->name);
-        $stmt->bindParam(':surname', $this->surname);
-        $stmt->bindParam(':email', $this->email);
+        $stmt->bindParam(':name', $data['name']);
+        $stmt->bindParam(':surname', $data['surname']);
+        $stmt->bindParam(':email', $data['email']);
         $stmt->bindParam(':password', $hashed_password);
-        $stmt->bindParam(':role', $this->role);
+        $stmt->bindParam(':role', $data['role']);
 
-        return $stmt->execute();
+        if ($stmt->execute()) {
+            return $this->conn->lastInsertId();
+        }
+        return false;
     }
 
-    // Vérifier les identifiants
+    // Check user
     public function login($email, $password) {
         $query = "SELECT id, name, surname, email, password, role 
                   FROM " . $this->table . " 
@@ -61,13 +62,13 @@ class User {
         return false;
     }
 
-    // Vérifier les permissions
+    // Check if user has permission based on role
     public function hasPermission($required_role) {
         $hierarchy = ['user' => 1, 'employee' => 2, 'manager' => 3, 'director' => 4];
         return $hierarchy[$this->role] >= $hierarchy[$required_role];
     }
 
-    // Récupérer un utilisateur par ID
+    // Get user by ID
     public function findById($id) {
         $query = "SELECT * FROM " . $this->table . " WHERE id = :id";
         $stmt = $this->conn->prepare($query);
@@ -85,6 +86,44 @@ class User {
             return true;
         }
         return false;
+    }
+
+    // Get user by email
+    public function findByEmail($email) {
+        $query = "SELECT * FROM " . $this->table . " WHERE email = :email";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':email', $email);
+        $stmt->execute();
+        return $stmt->fetch();
+    }
+
+    // Get all users
+    public function findAll() {
+        $query = "SELECT * FROM " . $this->table . " ORDER BY id DESC";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    // Update user
+    public function update($id, array $data) {
+        $fields = [];
+        $params = [':id' => $id];
+        foreach ($data as $key => $value) {
+            $fields[] = "$key = :$key";
+            $params[":$key"] = $value;
+        }
+        $sql = "UPDATE " . $this->table . " SET " . implode(', ', $fields) . " WHERE id = :id";
+        $stmt = $this->conn->prepare($sql);
+        return $stmt->execute($params);
+    }
+
+    // Delete user
+    public function delete($id) {
+        $query = "DELETE FROM " . $this->table . " WHERE id = :id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $id);
+        return $stmt->execute();
     }
 }
 

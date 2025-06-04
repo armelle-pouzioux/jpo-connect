@@ -1,107 +1,239 @@
 <?php
-// backend/routes/router.php
+// Initialiser la session
+session_start();
 
-require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../controller/JpoController.php';
-require_once __DIR__ . '/../controller/InscriptionController.php';
-require_once __DIR__ . '/../controller/CommentController.php';
-require_once __DIR__ . '/../controller/AdminController.php';
-// Ajoute d'autres require_once ici si tu as d’autres contrôleurs
+// Charger les contrôleurs
+require_once __DIR__ . '/../Controller/AuthController.php';
+require_once __DIR__ . '/../Controller/UserController.php';
+require_once __DIR__ . '/../Controller/JpoController.php';
+require_once __DIR__ . '/../Controller/RegistrationController.php';
+require_once __DIR__ . '/../Controller/CommentController.php';
+require_once __DIR__ . '/../Controller/DashboardController.php';
+require_once __DIR__ . '/../Controller/SettingsController.php';
+require_once __DIR__ . '/../Config/Database.php';
 
-// En-têtes JSON + CORS pour accès depuis React (localhost:5173)
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Origin: http://localhost:5173");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+use Controller\AuthController;
+use Controller\UserController;      
+use Controller\JpoController;
+use Controller\RegistrationController;
+use Controller\CommentController;
+use Controller\DashboardController; 
+use Controller\SettingsController;
+use Config\Database;
 
-// Gérer les requêtes préalables OPTIONS (indispensable pour React)
-if ($_SERVER["REQUEST_METHOD"] === "OPTIONS") {
-    http_response_code(200);
-    exit();
+$db = Database::getInstance()->getConnection();
+
+
+
+// Récupérer l'URL demandée
+$request_uri = $_SERVER['REQUEST_URI'];
+$path = parse_url($request_uri, PHP_URL_PATH);
+
+// Supprimer les slashes au début et à la fin
+$path = trim($path, '/');
+
+// Si le chemin est vide, rediriger vers la page d'accueil
+if (empty($path)) {
+    $path = 'home';
 }
 
-// Instanciation de la connexion BDD
-$database = new Database();
-$db = $database->getConnection();
+// Diviser le chemin en segments
+$segments = explode('/', $path);
+$controller = $segments[0] ?? 'home';
+$action = $segments[1] ?? 'index';
+$param1 = $segments[2] ?? null;
+$param2 = $segments[3] ?? null;
 
-// Récupérer la route et la méthode HTTP
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$method = $_SERVER['REQUEST_METHOD'];
-
-// ROUTES FRONT (utilisateurs visiteurs)
-
-// Récupérer toutes les JPO
-if ($uri === '/jpo' && $method === 'GET') {
-    $controller = new JpoController($db);
-    $controller->getAll();
+// Router les requêtes vers les contrôleurs appropriés
+switch ($controller) {
+    // Routes d'authentification
+    case 'login':
+        $authController = new AuthController();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $authController->login();
+        } else {
+            $authController->showLoginForm();
+        }
+        break;
+        
+    case 'register':
+        $authController = new AuthController();
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $authController->register();
+        } else {
+            $authController->showRegisterForm();
+        }
+        break;
+        
+    case 'logout':
+        $authController = new AuthController();
+        $authController->logout();
+        break;
+    
+    // Routes utilisateur
+    case 'profile':
+        $userController = new UserController();
+        if ($action === 'edit') {
+            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                $userController->updateProfile();
+            } else {
+                $userController->editProfile();
+            }
+        } else {
+            $userController->profile();
+        }
+        break;
+    
+    // Routes JPO
+    case 'jpo':
+        $jpoController = new JpoController($db);
+        if (empty($action) || $action === 'index') {
+            $jpoController->index();
+        } elseif (is_numeric($action)) {
+            $jpoController->show($action);
+        }
+        break;
+    
+    // Routes d'inscription
+    case 'registration':
+        $registrationController = new RegistrationController($db);
+        if ($action === 'register' && is_numeric($param1)) {
+            $registrationController->register($param1);
+        } elseif ($action === 'unregister' && is_numeric($param1)) {
+            $registrationController->unregister($param1);
+        } elseif ($action === 'my') {
+            $registrationController->myRegistrations();
+        }
+        break;
+    
+    // Routes de commentaires
+    case 'comment':
+        $commentController = new CommentController($db);
+        if ($action === 'add' && is_numeric($param1)) {
+            $commentController->addComment($param1);
+        }
+        break;
+    
+    // Routes d'administration
+    case 'admin':
+        switch ($action) {
+            // Dashboard
+            case 'dashboard':
+                $dashboardController = new DashboardController($db);
+                if ($param1 === 'statistics') {
+                    $dashboardController->statistics();
+                } elseif ($param1 === 'export' && !empty($param2)) {
+                    $dashboardController->exportData($param2);
+                } else {
+                    $dashboardController->index();
+                }
+                break;
+                
+            // Utilisateurs
+            case 'users':
+                $userController = new UserController();
+                if ($param1 === 'create') {
+                    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                        $userController->store();
+                    } else {
+                        $userController->create();
+                    }
+                } elseif ($param1 === 'edit' && is_numeric($param2)) {
+                    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                        $userController->update($param2);
+                    } else {
+                        $userController->edit($param2);
+                    }
+                } elseif ($param1 === 'delete' && is_numeric($param2)) {
+                    $userController->delete($param2);
+                } else {
+                    $userController->index();
+                }
+                break;
+                
+            // JPO
+            case 'jpo':
+                $jpoController = new JpoController($db);
+                if ($param1 === 'create') {
+                    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                        $jpoController->store();
+                    } else {
+                        $jpoController->create();
+                    }
+                } elseif ($param1 === 'edit' && is_numeric($param2)) {
+                    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                        $jpoController->update($param2);
+                    } else {
+                        $jpoController->edit($param2);
+                    }
+                } elseif ($param1 === 'delete' && is_numeric($param2)) {
+                    $jpoController->delete($param2);
+                } elseif ($param1 === 'finish' && is_numeric($param2)) {
+                    $jpoController->markAsFinished($param2);
+                } elseif ($param1 === 'cancel' && is_numeric($param2)) {
+                    $jpoController->markAsCanceled($param2);
+                } elseif (is_numeric($param1) && $param2 === 'registrations') {
+                    $registrationController = new RegistrationController($db);
+                    $registrationController->jpoRegistrations($param1);
+                } else {
+                    $jpoController->adminIndex();
+                }
+                break;
+                
+            // Commentaires
+            case 'comments':
+                $commentController = new CommentController($db);
+                if ($param1 === 'moderation') {
+                    $commentController->moderationQueue();
+                } elseif ($param1 === 'approve' && is_numeric($param2)) {
+                    $commentController->approveComment($param2);
+                } elseif ($param1 === 'reject' && is_numeric($param2)) {
+                    $commentController->rejectComment($param2);
+                } elseif ($param1 === 'delete' && is_numeric($param2)) {
+                    $commentController->deleteComment($param2);
+                } elseif ($param1 === 'respond' && is_numeric($param2)) {
+                    $commentController->addResponse($param2);
+                } else {
+                    $commentController->allComments();
+                }
+                break;
+                
+            // Inscriptions
+            case 'registrations':
+                $registrationController = new RegistrationController($db);
+                if ($param1 === 'present' && is_numeric($param2)) {
+                    $registrationController->markPresent($param2);
+                } elseif ($param1 === 'absent' && is_numeric($param2)) {
+                    $registrationController->markAbsent($param2);
+                } elseif ($param1 === 'remind' && is_numeric($param2)) {
+                    $registrationController->sendReminders($param2);
+                }
+                break;
+                
+            // Paramètres
+            case 'settings':
+                $settingsController = new SettingsController();
+                if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                    $settingsController->update();
+                } else {
+                    $settingsController->index();
+                }
+                break;
+                
+            // Page d'accueil admin
+            default:
+                $dashboardController = new DashboardController($db);
+                $dashboardController->index();
+                break;
+        }
+        break;
+    
+    // Page d'accueil
+    case 'home':
+    default:
+        // Rediriger vers la liste des JPO
+        $jpoController = new JpoController($db);
+        $jpoController->index();
+        break;
 }
 
-// Inscription à une JPO
-elseif ($uri === '/inscription' && $method === 'POST') {
-    $controller = new InscriptionController($db);
-    $controller->create();
-}
-
-// Désinscription d’un visiteur
-elseif ($uri === '/desinscription' && $method === 'DELETE') {
-    $controller = new InscriptionController($db);
-    $controller->delete(); // À implémenter
-}
-
-// Ajouter un commentaire
-elseif ($uri === '/commentaire' && $method === 'POST') {
-    $controller = new CommentController($db);
-    $controller->create();
-}
-
-// Récupérer les commentaires pour une JPO (par ex. /commentaire?id_jpo=3)
-elseif ($uri === '/commentaire' && $method === 'GET') {
-    $controller = new CommentController($db);
-    $controller->getAllByJpo(); // À implémenter
-}
-
-
-// ROUTES ADMIN / DASHBOARD
-
-// CRUD JPO - Ajouter une JPO
-elseif ($uri === '/admin/jpo' && $method === 'POST') {
-    $controller = new AdminController($db);
-    $controller->createJpo();
-}
-
-// Modifier une JPO
-elseif ($uri === '/admin/jpo' && $method === 'PUT') {
-    $controller = new AdminController($db);
-    $controller->updateJpo();
-}
-
-// Supprimer une JPO
-elseif ($uri === '/admin/jpo' && $method === 'DELETE') {
-    $controller = new AdminController($db);
-    $controller->deleteJpo();
-}
-
-// Récupérer les statistiques
-elseif ($uri === '/admin/stats' && $method === 'GET') {
-    $controller = new AdminController($db);
-    $controller->getStats();
-}
-
-// Modérer un commentaire
-elseif ($uri === '/admin/moderation' && $method === 'PUT') {
-    $controller = new CommentController($db);
-    $controller->moderate();
-}
-
-// Modifier contenu du site (ex: infos pratiques)
-elseif ($uri === '/admin/contenu' && $method === 'PUT') {
-    $controller = new AdminController($db);
-    $controller->updateContent();
-}
-
-
-// ROUTE PAR DÉFAUT : 404
-else {
-    http_response_code(404);
-    echo json_encode(["message" => "Route non trouvée"]);
-}

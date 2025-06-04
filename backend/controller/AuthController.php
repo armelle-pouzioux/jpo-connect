@@ -1,4 +1,6 @@
 <?php
+namespace Controller;
+
 require_once __DIR__ . '/../Models/User.php';
 use Models\User;
 use Config\Database;
@@ -148,8 +150,8 @@ class AuthController {
      * Middleware pour restreindre l'accès aux utilisateurs connectés
      */
     public static function requireLogin() {
-        if (!self::isLoggedIn()) {
-            $_SESSION['error'] = "Vous devez être connecté pour accéder à cette page";
+        if (!isset($_SESSION['user_id'])) {
+            $_SESSION['error'] = "Vous devez être connecté pour accéder à cette page.";
             header('Location: /login');
             exit;
         }

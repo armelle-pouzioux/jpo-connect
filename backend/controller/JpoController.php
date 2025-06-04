@@ -1,12 +1,26 @@
 <?php
+namespace Controller;
 require_once __DIR__ . '/../Models/JPO.php';
 require_once __DIR__ . '/AuthController.php';
+require_once __DIR__ . '/../Models/Registration.php';
+require_once __DIR__ . '/../Models/Comment.php';
+
+use Models\JPO;
+use Models\Comment;
+use Models\Registration;
+use Controller\AuthController;
+use Utils\Mailer; // Assuming Mailer is a utility class for sending emails
+
+// Remove the unused 'use Utils\Mailer;' if Mailer is not autoloaded
+
 
 class JPOController {
     private $jpoModel;
+    private $db;
 
-    public function __construct() {
-        $this->jpoModel = new JPO();
+    public function __construct($db) {
+        $this->db = $db;
+        $this->jpoModel = new JPO($db);
     }
 
     /**
@@ -49,8 +63,8 @@ class JPOController {
         }
         
         // Charger les commentaires approuvés pour cette JPO
-        require_once __DIR__ . '/../model/Comment.php';
-        $commentModel = new Comment();
+        require_once __DIR__ . '/../Models/Comment.php';
+        $commentModel = new Comment($this->db);
         $comments = $commentModel->findByJpo($id, 'approved');
         
         require_once __DIR__ . '/../view/jpo/show.php';
@@ -315,17 +329,15 @@ class JPOController {
             $_SESSION['success'] = "La JPO a été marquée comme annulée";
             
             // Envoyer un email à tous les inscrits pour les informer de l'annulation
-            require_once __DIR__ . '/../model/Registration.php';
-            $registrationModel = new Registration();
+            require_once __DIR__ . '/../Models/Registration.php';
+            $registrationModel = new Registration($this->db);
             $registrations = $registrationModel->findByJpo($id);
+
+            require_once __DIR__ . '/../Utils/Mailer.php';
+            $mailer = new Mailer();
             
-            if (!empty($registrations)) {
-                require_once __DIR__ . '/../utils/Mailer.php';
-                $mailer = new Mailer();
-                
-                foreach ($registrations as $registration) {
-                    $mailer->sendJpoCancelationEmail($registration['email'], $jpo);
-                }
+            foreach ($registrations as $registration) {
+                $mailer->sendJpoCancelationEmail($registration['email'], $jpo);
             }
         } else {
             $_SESSION['error'] = "Une erreur est survenue lors de la mise à jour du statut";

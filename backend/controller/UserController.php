@@ -1,10 +1,13 @@
-<?php
+<?
+namespace Controller;
+
 require_once __DIR__ . '/../Models/User.php';
 require_once __DIR__ . '/../Config/Database.php';
 require_once __DIR__ . '/AuthController.php';
 
 use Models\User;
 use Config\Database;
+use Controller\AuthController;
 
 class UserController {
     private $userModel;

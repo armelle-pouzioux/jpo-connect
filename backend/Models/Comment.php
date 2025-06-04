@@ -1,6 +1,9 @@
 <?php
 // models/Comment.php
 namespace Models;
+
+use PDO;
+
 class Comment {
     private $conn;
     private $table = 'comments';
@@ -81,5 +84,73 @@ class Comment {
         $stmt->bindParam(':id', $this->id);
         return $stmt->execute();
     }
+
+    // Trouver des commentaires par JPO
+    public function findByJpo($jpo_id, $status = null) {
+        $query = "SELECT c.*, u.name, u.surname 
+                  FROM " . $this->table . " c
+                  JOIN users u ON c.user_id = u.id
+                  WHERE c.jpo_id = :jpo_id";
+        if ($status) {
+            $query .= " AND c.status = :status";
+        }
+        $query .= " ORDER BY c.date_comment DESC";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':jpo_id', $jpo_id);
+        if ($status) {
+            $stmt->bindParam(':status', $status);
+        }
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
+
+    // Trouver des commentaires par statut
+    public function findByStatus($status, $limit = null) {
+        $query = "SELECT * FROM " . $this->table . " WHERE status = :status ORDER BY created_at DESC";
+        if ($limit !== null) {
+            $query .= " LIMIT :limit";
+        }
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':status', $status);
+        if ($limit !== null) {
+            $stmt->bindValue(':limit', (int)$limit, PDO::PARAM_INT);
+        }
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Trouver un commentaire par ID
+    public function findById($commentId) {
+        $query = "SELECT * FROM " . $this->table . " WHERE id = :id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':id', $commentId, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    // Mettre à jour le statut d'un commentaire
+    public function updateStatus($commentId, $status) {
+        $query = "UPDATE " . $this->table . " SET status = :status WHERE id = :id";
+        $stmt = $this->conn->prepare($query);
+        $stmt->bindParam(':status', $status);
+        $stmt->bindParam(':id', $commentId, PDO::PARAM_INT);
+        return $stmt->execute();
+    }
+
+    // Récupérer tous les commentaires
+    public function findAll() {
+        $query = "SELECT * FROM " . $this->table . " ORDER BY created_at DESC";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    public function countByStatus($status) {
+    $query = "SELECT COUNT(*) FROM " . $this->table . " WHERE status = :status";
+    $stmt = $this->conn->prepare($query);
+    $stmt->bindParam(':status', $status);
+    $stmt->execute();
+    return (int)$stmt->fetchColumn();
+}
 }
 

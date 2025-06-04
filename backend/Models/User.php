@@ -1,5 +1,8 @@
 <?php
 namespace Models;
+
+use PDO;
+
 class User {
     private $conn;
     private $table = 'users';
@@ -124,6 +127,22 @@ class User {
         $stmt = $this->conn->prepare($query);
         $stmt->bindParam(':id', $id);
         return $stmt->execute();
+    }
+
+    // Count users
+    public function count() {
+        $query = "SELECT COUNT(*) FROM " . $this->table;
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return (int)$stmt->fetchColumn();
+    }
+
+    // Count users by role
+    public function countByRole() {
+        $query = "SELECT role, COUNT(*) as total FROM " . $this->table . " GROUP BY role";
+        $stmt = $this->conn->prepare($query);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 

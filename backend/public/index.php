@@ -1,2 +1,2 @@
 <?php
-require_once __DIR__ . '/../routes/router.php';
+require_once __DIR__ . '/../Routes/router.php';

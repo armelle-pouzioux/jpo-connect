@@ -1,6 +1,8 @@
 <?php
 // backend/controller/InscriptionController.php
 
+use Models\Registration;
+
 require_once __DIR__ . '/../model/Inscription.php';
 
 class InscriptionController {
@@ -15,8 +17,8 @@ class InscriptionController {
 
         if (
             empty($data['jpo_id']) ||
-            empty($data['nom']) ||
-            empty($data['prenom']) ||
+            empty($data['name']) ||
+            empty($data['surname']) ||
             empty($data['email'])
         ) {
             http_response_code(400);
@@ -25,13 +27,13 @@ class InscriptionController {
         }
 
         $jpo_id = intval($data['jpo_id']);
-        $nom = trim($data['nom']);
-        $prenom = trim($data['prenom']);
+        $name = trim($data['name']);
+        $surname = trim($data['surname']);
         $email = trim($data['email']);
         $telephone = isset($data['telephone']) ? trim($data['telephone']) : null;
 
-        $model = new Inscription($this->db);
-        $result = $model->inscrire($jpo_id, $nom, $prenom, $email, $telephone);
+        $model = new Registration($this->db);
+        $result = $model->register($jpo_id, $name, $surname, $email, $telephone);
 
         if ($result === true) {
             http_response_code(201);

@@ -1,6 +1,8 @@
 <?php
 // backend/controller/JpoController.php
 
+use Models\JPO;
+
 require_once __DIR__ . '/../model/Jpo.php';
 
 class JpoController {
@@ -11,7 +13,7 @@ class JpoController {
     }
 
     public function getAll() {
-        $model = new Jpo($this->db);
+        $model = new JPO($this->db);
         $jpos = $model->getAll();
 
         if (count($jpos) > 0) {

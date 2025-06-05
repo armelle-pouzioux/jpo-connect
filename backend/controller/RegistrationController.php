@@ -1,11 +1,6 @@
 <?php
 namespace Controller;
 
-require_once __DIR__ . '/../Models/Registration.php';
-require_once __DIR__ . '/../Models/JPO.php';
-require_once __DIR__ . '/../Models/User.php';
-require_once __DIR__ . '/AuthController.php';
-
 use Models\Registration;
 use Models\JPO;         
 use Models\User;

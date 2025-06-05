@@ -1,9 +1,6 @@
 <?php
 namespace Controller;
 
-require_once __DIR__ . '/../Models/Setting.php';
-require_once __DIR__ . '/AuthController.php';
-
 use Models\Setting;
 use Controller\AuthController;
 

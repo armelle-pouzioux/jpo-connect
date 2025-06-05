@@ -1,0 +1,15 @@
+{
+    "name": "armelle1/jpo-connect",
+    "autoload": {
+        "psr-4": {
+            "Armelle1\\JpoConnect\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "armelle-pouzioux",
+            "email": "armelle.pouzioux@laplateforme.io"
+        }
+    ],
+    "require": {}
+}

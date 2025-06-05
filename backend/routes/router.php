@@ -3,14 +3,7 @@
 session_start();
 
 // Charger les contrôleurs
-require_once __DIR__ . '/../Controller/AuthController.php';
-require_once __DIR__ . '/../Controller/UserController.php';
-require_once __DIR__ . '/../Controller/JpoController.php';
-require_once __DIR__ . '/../Controller/RegistrationController.php';
-require_once __DIR__ . '/../Controller/CommentController.php';
-require_once __DIR__ . '/../Controller/DashboardController.php';
-require_once __DIR__ . '/../Controller/SettingsController.php';
-require_once __DIR__ . '/../Config/Database.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
 
 use Controller\AuthController;
 use Controller\UserController;      

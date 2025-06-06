@@ -1,15 +1,19 @@
 {
-    "name": "armelle1/jpo-connect",
+    "name": "jpo-connect/app",
+    "description": "Plateforme de gestion des journées portes ouvertes",
+    "type": "project",
     "autoload": {
         "psr-4": {
-            "Armelle1\\JpoConnect\\": "src/"
+            "Config\\": "backend/Config/",
+            "Controller\\": "backend/Controller/",
+            "Models\\": "backend/Models/",
+            "Utils\\": "backend/Utils/"
         }
     },
-    "authors": [
-        {
-            "name": "armelle-pouzioux",
-            "email": "armelle.pouzioux@laplateforme.io"
-        }
-    ],
-    "require": {}
+    "require": {
+        "php": ">=7.4"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.0"
+    }
 }

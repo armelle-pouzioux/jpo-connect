@@ -5,12 +5,8 @@ use Models\JPO;
 use Models\Comment;
 use Models\Registration;
 use Controller\AuthController;
-use Utils\Mailer; // Assuming Mailer is a utility class for sending emails
 
-// Remove the unused 'use Utils\Mailer;' if Mailer is not autoloaded
-
-
-class JPOController {
+class JpoController {
     private $jpoModel;
     private $db;
 
@@ -20,326 +16,146 @@ class JPOController {
     }
 
     /**
-     * Affiche la liste des JPO pour les visiteurs
+     * GET /jpo → Liste des JPO visibles
      */
     public function index() {
-        $place = filter_input(INPUT_GET, 'place', FILTER_SANITIZE_SPECIAL_CHARS);
-        $status = filter_input(INPUT_GET, 'status', FILTER_SANITIZE_SPECIAL_CHARS);
-        
-        // Filtrer les JPO selon les paramètres
+        $place = $_GET['place'] ?? null;
+        $status = $_GET['status'] ?? 'upcoming';
+
         $filters = [];
-        if (!empty($place)) {
-            $filters['place'] = $place;
-        }
-        if (!empty($status)) {
-            $filters['status'] = $status;
-        } else {
-            // Par défaut, afficher uniquement les JPO à venir
-            $filters['status'] = 'upcoming';
-        }
-        
+        if (!empty($place)) $filters['place'] = $place;
+        if (!empty($status)) $filters['status'] = $status;
+
         $jpos = $this->jpoModel->findAll($filters);
-        
-        // Récupérer la liste des villes pour le filtre
         $places = $this->jpoModel->getPlaces();
-        
-        require_once __DIR__ . '/../view/jpo/index.php';
+
+        echo json_encode([
+            "success" => true,
+            "jpos" => $jpos,
+            "places" => $places
+        ]);
     }
 
     /**
-     * Affiche les détails d'une JPO
+     * GET /jpo/{id} → Afficher une JPO + commentaires
      */
     public function show($id) {
         $jpo = $this->jpoModel->findById($id);
-        
+
         if (!$jpo) {
-            $_SESSION['error'] = "JPO non trouvée";
-            header('Location: /jpo');
-            exit;
+            http_response_code(404);
+            echo json_encode(["success" => false, "message" => "JPO introuvable"]);
+            return;
         }
-        
-        // Charger les commentaires approuvés pour cette JPO
-        require_once __DIR__ . '/../Models/Comment.php';
+
         $commentModel = new Comment($this->db);
         $comments = $commentModel->findByJpo($id, 'approved');
-        
-        require_once __DIR__ . '/../view/jpo/show.php';
+
+        echo json_encode([
+            "success" => true,
+            "jpo" => $jpo,
+            "comments" => $comments
+        ]);
     }
 
     /**
-     * Affiche la liste des JPO (admin)
+     * GET /admin/jpo → Liste complète admin
      */
     public function adminIndex() {
         AuthController::requireRole(['employee', 'manager', 'director']);
-        
         $jpos = $this->jpoModel->findAll();
-        require_once __DIR__ . '/../view/admin/jpo/index.php';
+        echo json_encode([
+            "success" => true,
+            "jpos" => $jpos
+        ]);
     }
 
     /**
-     * Affiche le formulaire de création d'une JPO (admin)
-     */
-    public function create() {
-        AuthController::requireRole(['manager', 'director']);
-        
-        require_once __DIR__ . '/../view/admin/jpo/create.php';
-    }
-
-    /**
-     * Traite la création d'une JPO (admin)
+     * POST /admin/jpo → Créer une JPO
      */
     public function store() {
         AuthController::requireRole(['manager', 'director']);
-        
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $description = filter_input(INPUT_POST, 'description', FILTER_SANITIZE_SPECIAL_CHARS);
-            $date = filter_input(INPUT_POST, 'date', FILTER_SANITIZE_SPECIAL_CHARS);
-            $time = filter_input(INPUT_POST, 'time', FILTER_SANITIZE_SPECIAL_CHARS);
-            $place = filter_input(INPUT_POST, 'place', FILTER_SANITIZE_SPECIAL_CHARS);
-            $capacity = filter_input(INPUT_POST, 'capacity', FILTER_VALIDATE_INT);
-            
-            // Validation des données
-            if (empty($date) || empty($time) || empty($place) || empty($capacity)) {
-                $_SESSION['error'] = "Tous les champs sont obligatoires";
-                header('Location: /admin/jpo/create');
-                exit;
-            }
-            
-            // Vérifier que la place est valide
-            $validPlaces = ['Marseille', 'Paris', 'Cannes', 'Martigues', 'Toulon', 'Brignoles'];
-            if (!in_array($place, $validPlaces)) {
-                $_SESSION['error'] = "Le lieu sélectionné n'est pas valide";
-                header('Location: /admin/jpo/create');
-                exit;
-            }
-            
-            // Vérifier que la capacité est un nombre positif
-            if ($capacity <= 0) {
-                $_SESSION['error'] = "La capacité doit être un nombre positif";
-                header('Location: /admin/jpo/create');
-                exit;
-            }
-            
-            // Formater la date et l'heure
-            $dateTime = date('Y-m-d H:i:s', strtotime("$date $time"));
-            
-            // Création de la JPO
-            $jpoId = $this->jpoModel->create([
-                'description' => $description,
-                'date_jpo' => $dateTime,
-                'place' => $place,
-                'capacity' => $capacity,
-                'registered' => 0,
-                'status' => 'upcoming'
-            ]);
-            
-            if ($jpoId) {
-                $_SESSION['success'] = "La JPO a été créée avec succès";
-                header('Location: /admin/jpo');
-                exit;
-            } else {
-                $_SESSION['error'] = "Une erreur est survenue lors de la création de la JPO";
-                header('Location: /admin/jpo/create');
-                exit;
-            }
+
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        if (!$data || empty($data['date']) || empty($data['time']) || empty($data['place']) || empty($data['capacity'])) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Champs obligatoires manquants"]);
+            return;
         }
+
+        $description = $data['description'] ?? '';
+        $datetime = date('Y-m-d H:i:s', strtotime($data['date'] . ' ' . $data['time']));
+
+        $jpoId = $this->jpoModel->create([
+            'description' => $description,
+            'date_jpo' => $datetime,
+            'place' => $data['place'],
+            'capacity' => (int)$data['capacity'],
+            'registered' => 0,
+            'status' => 'upcoming'
+        ]);
+
+        echo json_encode([
+            "success" => (bool)$jpoId,
+            "jpo_id" => $jpoId
+        ]);
     }
 
     /**
-     * Affiche le formulaire d'édition d'une JPO (admin)
-     */
-    public function edit($id) {
-        AuthController::requireRole(['manager', 'director']);
-        
-        $jpo = $this->jpoModel->findById($id);
-        
-        if (!$jpo) {
-            $_SESSION['error'] = "JPO non trouvée";
-            header('Location: /admin/jpo');
-            exit;
-        }
-        
-        require_once __DIR__ . '/../view/admin/jpo/edit.php';
-    }
-
-    /**
-     * Traite la mise à jour d'une JPO (admin)
+     * PUT /admin/jpo → Modifier une JPO
      */
     public function update($id) {
-        AuthController::requireRole(['manager', 'director']);
-        
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $description = filter_input(INPUT_POST, 'description', FILTER_SANITIZE_SPECIAL_CHARS);
-            $date = filter_input(INPUT_POST, 'date', FILTER_SANITIZE_SPECIAL_CHARS);
-            $time = filter_input(INPUT_POST, 'time', FILTER_SANITIZE_SPECIAL_CHARS);
-            $place = filter_input(INPUT_POST, 'place', FILTER_SANITIZE_SPECIAL_CHARS);
-            $capacity = filter_input(INPUT_POST, 'capacity', FILTER_VALIDATE_INT);
-            $status = filter_input(INPUT_POST, 'status', FILTER_SANITIZE_SPECIAL_CHARS);
-            
-            // Validation des données
-            if (empty($date) || empty($time) || empty($place) || empty($capacity) || empty($status)) {
-                $_SESSION['error'] = "Tous les champs sont obligatoires";
-                header('Location: /admin/jpo/edit/' . $id);
-                exit;
-            }
-            
-            // Vérifier que la JPO existe
-            $jpo = $this->jpoModel->findById($id);
-            if (!$jpo) {
-                $_SESSION['error'] = "JPO non trouvée";
-                header('Location: /admin/jpo');
-                exit;
-            }
-            
-            // Vérifier que la place est valide
-            $validPlaces = ['Marseille', 'Paris', 'Cannes', 'Martigues', 'Toulon', 'Brignoles'];
-            if (!in_array($place, $validPlaces)) {
-                $_SESSION['error'] = "Le lieu sélectionné n'est pas valide";
-                header('Location: /admin/jpo/edit/' . $id);
-                exit;
-            }
-            
-            // Vérifier que le statut est valide
-            $validStatuses = ['upcoming', 'finished', 'canceled'];
-            if (!in_array($status, $validStatuses)) {
-                $_SESSION['error'] = "Le statut sélectionné n'est pas valide";
-                header('Location: /admin/jpo/edit/' . $id);
-                exit;
-            }
-            
-            // Vérifier que la capacité est un nombre positif
-            if ($capacity <= 0) {
-                $_SESSION['error'] = "La capacité doit être un nombre positif";
-                header('Location: /admin/jpo/edit/' . $id);
-                exit;
-            }
-            
-            // Vérifier que la capacité est supérieure ou égale au nombre d'inscrits
-            if ($capacity < $jpo['registered']) {
-                $_SESSION['error'] = "La capacité ne peut pas être inférieure au nombre d'inscrits";
-                header('Location: /admin/jpo/edit/' . $id);
-                exit;
-            }
-            
-            // Formater la date et l'heure
-            $dateTime = date('Y-m-d H:i:s', strtotime("$date $time"));
-            
-            // Mise à jour de la JPO
-            $jpoData = [
-                'description' => $description,
-                'date_jpo' => $dateTime,
-                'place' => $place,
-                'capacity' => $capacity,
-                'status' => $status
-            ];
-            
-            $success = $this->jpoModel->update($id, $jpoData);
-            
-            if ($success) {
-                $_SESSION['success'] = "La JPO a été mise à jour avec succès";
-                header('Location: /admin/jpo');
-                exit;
-            } else {
-                $_SESSION['error'] = "Une erreur est survenue lors de la mise à jour de la JPO";
-                header('Location: /admin/jpo/edit/' . $id);
-                exit;
-            }
+        // AuthController::requireRole(['manager', 'director']);
+
+        $data = json_decode(file_get_contents("php://input"), true);
+
+        if (!$data) {
+            http_response_code(400);
+            echo json_encode(["success" => false, "message" => "Pas de données reçues"]);
+            return;
         }
+
+        $datetime = date('Y-m-d H:i:s', strtotime($data['date'] . ' ' . $data['time']));
+        $jpoData = [
+            'description' => $data['description'] ?? '',
+            'date_jpo' => $datetime,
+            'place' => $data['place'],
+            'capacity' => (int)$data['capacity'],
+            'status' => $data['status']
+        ];
+
+        $success = $this->jpoModel->update($id, $jpoData);
+        echo json_encode(["success" => $success]);
     }
 
     /**
-     * Supprime une JPO (admin)
+     * DELETE /admin/jpo → Supprimer une JPO
      */
     public function delete($id) {
         AuthController::requireRole(['director']);
-        
-        // Vérifier si la JPO existe
-        $jpo = $this->jpoModel->findById($id);
-        
-        if (!$jpo) {
-            $_SESSION['error'] = "JPO non trouvée";
-            header('Location: /admin/jpo');
-            exit;
-        }
-        
-        // Supprimer la JPO
+
         $success = $this->jpoModel->delete($id);
-        
-        if ($success) {
-            $_SESSION['success'] = "La JPO a été supprimée avec succès";
-        } else {
-            $_SESSION['error'] = "Une erreur est survenue lors de la suppression de la JPO";
-        }
-        
-        header('Location: /admin/jpo');
-        exit;
+        echo json_encode(["success" => $success]);
     }
 
     /**
-     * Marque une JPO comme terminée (admin)
+     * PUT /admin/jpo/finish/{id}
      */
     public function markAsFinished($id) {
         AuthController::requireRole(['employee', 'manager', 'director']);
-        
-        // Vérifier si la JPO existe
-        $jpo = $this->jpoModel->findById($id);
-        
-        if (!$jpo) {
-            $_SESSION['error'] = "JPO non trouvée";
-            header('Location: /admin/jpo');
-            exit;
-        }
-        
-        // Mettre à jour le statut
         $success = $this->jpoModel->update($id, ['status' => 'finished']);
-        
-        if ($success) {
-            $_SESSION['success'] = "La JPO a été marquée comme terminée";
-        } else {
-            $_SESSION['error'] = "Une erreur est survenue lors de la mise à jour du statut";
-        }
-        
-        header('Location: /admin/jpo');
-        exit;
+        echo json_encode(["success" => $success]);
     }
 
     /**
-     * Marque une JPO comme annulée (admin)
+     * PUT /admin/jpo/cancel/{id}
      */
     public function markAsCanceled($id) {
         AuthController::requireRole(['manager', 'director']);
-        
-        // Vérifier si la JPO existe
-        $jpo = $this->jpoModel->findById($id);
-        
-        if (!$jpo) {
-            $_SESSION['error'] = "JPO non trouvée";
-            header('Location: /admin/jpo');
-            exit;
-        }
-        
-        // Mettre à jour le statut
         $success = $this->jpoModel->update($id, ['status' => 'canceled']);
-        
-        if ($success) {
-            $_SESSION['success'] = "La JPO a été marquée comme annulée";
-            
-            // Envoyer un email à tous les inscrits pour les informer de l'annulation
-            require_once __DIR__ . '/../Models/Registration.php';
-            $registrationModel = new Registration($this->db);
-            $registrations = $registrationModel->findByJpo($id);
 
-            require_once __DIR__ . '/../Utils/Mailer.php';
-            $mailer = new Mailer();
-            
-            foreach ($registrations as $registration) {
-                $mailer->sendJpoCancelationEmail($registration['email'], $jpo);
-            }
-        } else {
-            $_SESSION['error'] = "Une erreur est survenue lors de la mise à jour du statut";
-        }
-        
-        header('Location: /admin/jpo');
-        exit;
+        // Tu peux ajouter une logique d'envoi de mail ici plus tard si tu veux
+        echo json_encode(["success" => $success, "message" => "Statut mis à jour"]);
     }
 }

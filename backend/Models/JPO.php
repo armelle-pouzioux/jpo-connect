@@ -18,6 +18,7 @@ class JPO {
 
     public function __construct($db) {
         $this->conn = $db;
+        $this->table ='jpo';
     }
 
     // Créer un JPO

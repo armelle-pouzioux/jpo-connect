@@ -2,7 +2,12 @@
     "name": "armelle1/jpo-connect",
     "autoload": {
         "psr-4": {
-            "Armelle1\\JpoConnect\\": "src/"
+            "Config\\": "backend/Config/",
+            "Controller\\": "backend/Controller/",
+            "Models\\": "backend/Models/",
+            "Public\\": "backend/Public/",
+            "Routes\\": "backend/Routes/",     
+            "Utils\\": "backend/Utils/"
         }
     },
     "authors": [

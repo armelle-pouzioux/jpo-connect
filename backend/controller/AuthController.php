@@ -1,7 +1,6 @@
 <?php
 namespace Controller;
 
-require_once __DIR__ . '/../Models/User.php';
 use Models\User;
 use Config\Database;
 
@@ -9,131 +8,170 @@ class AuthController {
     private $userModel;
 
     public function __construct() {
-        $db = (new Database())->getConnection();
+        $db = Database::getInstance()->getConnection();
         $this->userModel = new User($db);
     }
 
-    public function showLoginForm() {
-        require_once __DIR__ . '/../view/auth/login.php';
-    }
+    public function apiLogin() {
+        header('Content-Type: application/json');
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+            return;
+        }
 
-    public function login() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
-            $password = $_POST['password'] ?? '';
+        $input = json_decode(file_get_contents('php://input'), true);
+        $email = filter_var($input['email'] ?? '', FILTER_SANITIZE_EMAIL);
+        $password = $input['password'] ?? '';
 
-            if (empty($email) || empty($password)) {
-                $_SESSION['error'] = "Tous les champs sont obligatoires";
-                header('Location: /login');
-                exit;
+        if (empty($email) || empty($password)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Email et mot de passe requis']);
+            return;
+        }
+
+        $user = $this->userModel->findByEmail($email);
+        
+        if ($user && password_verify($password, $user['password'])) {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
             }
-
-            $user = $this->userModel->findByEmail($email);
             
-            if ($user && password_verify($password, $user['password'])) {
-                // Création de la session
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['user_role'] = $user['role'];
-                $_SESSION['user_name'] = $user['name'];
-                $_SESSION['user_surname'] = $user['surname'];
-                
-                // Redirection selon le rôle
-                if (in_array($user['role'], ['employee', 'manager', 'director'])) {
-                    header('Location: /dashboard');
-                } else {
-                    header('Location: /');
-                }
-                exit;
-            } else {
-                $_SESSION['error'] = "Email ou mot de passe incorrect";
-                header('Location: /login');
-                exit;
-            }
-        }
-    }
-
-    /**
-     * Affiche la page d'inscription
-     */
-    public function showRegisterForm() {
-        require_once __DIR__ . '/../view/auth/register.php';
-    }
-
-    /**
-     * Traite l'inscription d'un utilisateur
-     */
-    public function register() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $name = filter_input(INPUT_POST, 'name', FILTER_SANITIZE_SPECIAL_CHARS);
-            $surname = filter_input(INPUT_POST, 'surname', FILTER_SANITIZE_SPECIAL_CHARS);
-            $email = filter_input(INPUT_POST, 'email', FILTER_SANITIZE_EMAIL);
-            $password = $_POST['password'] ?? '';
-            $confirmPassword = $_POST['confirm_password'] ?? '';
-
-            // Validation des données
-            if (empty($name) || empty($surname) || empty($email) || empty($password)) {
-                $_SESSION['error'] = "Tous les champs sont obligatoires";
-                header('Location: /register');
-                exit;
-            }
-
-            if ($password !== $confirmPassword) {
-                $_SESSION['error'] = "Les mots de passe ne correspondent pas";
-                header('Location: /register');
-                exit;
-            }
-
-            // Vérifier si l'email existe déjà
-            if ($this->userModel->findByEmail($email)) {
-                $_SESSION['error'] = "Cet email est déjà utilisé";
-                header('Location: /register');
-                exit;
-            }
-
-            // Hashage du mot de passe
-            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-
-            // Création de l'utilisateur
-            $userId = $this->userModel->create([
-                'name' => $name,
-                'surname' => $surname,
-                'email' => $email,
-                'password' => $hashedPassword,
-                'role' => 'user'
+            $_SESSION['user_id'] = $user['id'];
+            $_SESSION['user_role'] = $user['role'];
+            $_SESSION['user_name'] = $user['name'];
+            $_SESSION['user_surname'] = $user['surname'];
+            
+            $token = bin2hex(random_bytes(32));
+            $_SESSION['api_token'] = $token;
+            
+            echo json_encode([
+                'success' => true,
+                'message' => 'Connexion réussie',
+                'user' => [
+                    'id' => $user['id'],
+                    'name' => $user['name'],
+                    'surname' => $user['surname'],
+                    'email' => $user['email'],
+                    'role' => $user['role']
+                ],
+                'token' => $token
             ]);
-
-            if ($userId) {
-                $_SESSION['success'] = "Votre compte a été créé avec succès";
-                header('Location: /login');
-                exit;
-            } else {
-                $_SESSION['error'] = "Une erreur est survenue lors de la création du compte";
-                header('Location: /register');
-                exit;
-            }
+        } else {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'Email ou mot de passe incorrect']);
         }
     }
 
-    /**
-     * Déconnexion de l'utilisateur
-     */
-    public function logout() {
-        session_start();
-        session_destroy();
-        header('Location: /');
-        exit;
+    public function apiRegister() {
+        header('Content-Type: application/json');
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'message' => 'Méthode non autorisée']);
+            return;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        $name = filter_var($input['name'] ?? '', FILTER_SANITIZE_SPECIAL_CHARS);
+        $surname = filter_var($input['surname'] ?? '', FILTER_SANITIZE_SPECIAL_CHARS);
+        $email = filter_var($input['email'] ?? '', FILTER_SANITIZE_EMAIL);
+        $password = $input['password'] ?? '';
+        $confirmPassword = $input['confirm_password'] ?? '';
+
+        if (empty($name) || empty($surname) || empty($email) || empty($password)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Tous les champs sont obligatoires']);
+            return;
+        }
+
+        if ($password !== $confirmPassword) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Les mots de passe ne correspondent pas']);
+            return;
+        }
+
+        if (strlen($password) < 6) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Le mot de passe doit contenir au moins 6 caractères']);
+            return;
+        }
+
+        if ($this->userModel->findByEmail($email)) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'message' => 'Cet email est déjà utilisé']);
+            return;
+        }
+
+        $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+
+        $userId = $this->userModel->create([
+            'name' => $name,
+            'surname' => $surname,
+            'email' => $email,
+            'password' => $hashedPassword,
+            'role' => 'user'
+        ]);
+
+        if ($userId) {
+            echo json_encode([
+                'success' => true,
+                'message' => 'Compte créé avec succès',
+                'user_id' => $userId
+            ]);
+        } else {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Erreur lors de la création du compte']);
+        }
     }
 
-    /**
-     * Vérifie si l'utilisateur est connecté
-     */
+    public function apiLogout() {
+        header('Content-Type: application/json');
+        
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        session_destroy();
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Déconnexion réussie'
+        ]);
+    }
+
+    public function apiMe() {
+        header('Content-Type: application/json');
+        
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        
+        if (!isset($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'Non authentifié']);
+            return;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'user' => [
+                'id' => $_SESSION['user_id'],
+                'name' => $_SESSION['user_name'],
+                'surname' => $_SESSION['user_surname'],
+                'role' => $_SESSION['user_role']
+            ]
+        ]);
+    }
+
     public static function isLoggedIn() {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
         return isset($_SESSION['user_id']);
     }
 
-    /**
-     * Vérifie si l'utilisateur a un rôle spécifique
-     */
     public static function hasRole($role) {
         if (!self::isLoggedIn()) {
             return false;
@@ -146,26 +184,20 @@ class AuthController {
         return $_SESSION['user_role'] === $role;
     }
 
-    /**
-     * Middleware pour restreindre l'accès aux utilisateurs connectés
-     */
     public static function requireLogin() {
-        if (!isset($_SESSION['user_id'])) {
-            $_SESSION['error'] = "Vous devez être connecté pour accéder à cette page.";
-            header('Location: /login');
+        if (!self::isLoggedIn()) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'Authentification requise']);
             exit;
         }
     }
 
-    /**
-     * Middleware pour restreindre l'accès selon le rôle
-     */
     public static function requireRole($roles) {
         self::requireLogin();
         
         if (!self::hasRole($roles)) {
-            $_SESSION['error'] = "Vous n'avez pas les droits nécessaires pour accéder à cette page";
-            header('Location: /');
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Droits insuffisants']);
             exit;
         }
     }

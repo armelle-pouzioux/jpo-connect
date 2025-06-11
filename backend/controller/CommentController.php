@@ -1,9 +1,5 @@
 <?php
 namespace Controller;
-require_once __DIR__ . '/../Models/Comment.php';
-require_once __DIR__ . '/../Models/CommentResponse.php';
-require_once __DIR__ . '/../Models/Jpo.php';
-require_once __DIR__ . '/AuthController.php';
 
 use Models\Comment;
 use Models\CommentResponse;  

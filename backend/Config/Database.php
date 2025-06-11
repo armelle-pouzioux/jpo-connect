@@ -5,7 +5,7 @@ use PDO;
 use PDOException;
 
 class Database {
-    private static $instance = null; // Singleton instance
+    private static $instance = null;
 
     private $host = 'localhost';
     private $db_name = 'jpo_connect';
@@ -13,7 +13,6 @@ class Database {
     private $password = '';
     private $conn;
 
-    // Singleton: retourne l'instance unique de Database
     public static function getInstance() {
         if (self::$instance === null) {
             self::$instance = new Database();

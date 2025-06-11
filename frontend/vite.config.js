@@ -7,15 +7,11 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      // Proxy pour vos API PHP
       '/api': {
-        target: 'http://localhost/jpo-connect/backend',
+        target: 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '')
+        rewrite: (path) => path.replace(/^\/api/, ''),
       }
     }
-  },
-  build: {
-    outDir: '../public/dist', // Build dans le dossier public de votre backend
   }
-})
+});

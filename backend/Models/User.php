@@ -42,6 +42,7 @@ class User {
             return false;
             
         } catch (PDOException $e) {
+            throw $e; 
             error_log("Erreur création utilisateur: " . $e->getMessage());
             return false;
         }
